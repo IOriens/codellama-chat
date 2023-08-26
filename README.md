@@ -2,6 +2,8 @@
 
 The CodeLlama Chat Assistant is a project built on Flask and the CodeLlama AI model, designed to facilitate real-time chat interactions with an AI assistant. This project enables users to send chat messages and receive responses from the AI assistant.
 
+![ChatGPT Next Web with Codellama](assets/chatgpt-next-web-codellama.png)
+
 ## Features
 
 - Real-Time Chat Interaction: Engage in real-time chat interactions with the AI assistant by sending chat messages to the API.
