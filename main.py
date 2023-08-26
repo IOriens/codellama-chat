@@ -58,6 +58,7 @@ def chat_completions():
     # Run CodeLlama
     response = run_chat_completion(messages)
     response = list(response)
+    response = response[-1]
 
 
 
