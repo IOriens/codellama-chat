@@ -5,6 +5,8 @@ import torch
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer, BitsAndBytesConfig
 from flask import Flask, request, jsonify
 import torch.distributed as dist
+from flask_cors import CORS
+
 
 # CodeLlama model 
 model_id = 'codellama/CodeLlama-7b-Instruct-hf'
@@ -30,6 +32,7 @@ tokenizer = AutoTokenizer.from_pretrained(model_id)
 
 # Flask API
 app = Flask(__name__)
+CORS(app)
 
 @app.route("/v1/chat/completions", methods=["POST"]) 
 def chat_completions():

@@ -3,3 +3,4 @@ torch
 flask
 accelerate
 bitsandbytes
+flask-cors
