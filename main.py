@@ -18,17 +18,17 @@ import json
 # CodeLlama model
 model_id = "codellama/CodeLlama-7b-Instruct-hf"
 quantization_config = BitsAndBytesConfig(
-    load_in_4bit=True, bnb_4bit_compute_dtype=torch.float16
+    load_in_4bit=True,
+    bnb_4bit_compute_dtype=torch.float16,
+    # llm_int8_enable_fp32_cpu_offload=True
 )
 if torch.cuda.is_available():
     config = AutoConfig.from_pretrained(model_id)
-    # config.pretraining_tp = 1
+    config.pretraining_tp = 1
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
         config=config,
         quantization_config=quantization_config,
-        # torch_dtype=torch.float16,
-        # load_in_4bit=True,
         device_map="auto",
         # use_safetensors=False,
     )
@@ -45,11 +45,16 @@ CORS(app)
 def chat_completions():
     content = request.json
     messages = content["messages"]
+    temperature = content.get("temperature", 0.1)
+    top_p = content.get("top_p", 0.9)
+    top_k = content.get("top_k", 10)
+    stream = content.get("stream", False)
+    max_new_tokens = content.get("max_tokens", 1024)
 
     # Process messages
     if messages[0]["role"] == "assistant":
         messages[0]["role"] = "system"
-    print(content)
+
     last_role = None
     remove_elements = []
     for i in range(len(messages)):
@@ -59,14 +64,17 @@ def chat_completions():
         else:
             last_role = messages[i]["role"]
 
-    for element in remove_elements:
-        messages.pop(element)
+    # remove messages in remove_elements
+    finalMessages = []
+    for i in range(len(messages)):
+        if not i in remove_elements:
+            finalMessages.append(messages[i])
 
-    response = run_chat_completion(messages)
+    response = run_chat_completion(
+        finalMessages, max_new_tokens, temperature, top_p, top_k
+    )
 
-    if content["stream"]:
-
-
+    if stream:
         def generate():
             outputs = []
             for text in response:
@@ -74,16 +82,20 @@ def chat_completions():
                 yield "data: " + json.dumps(
                     {"choices": [{"delta": {"role": "assistant", "content": text}}]}
                 ) + "\n\n"
-
         return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
     # get outputs
     outputs = []
-    for text in response:
-        outputs.append(text)
+    if not response is None:
+        for text in response:
+            outputs.append(text)
+    else:
+        print("response is None")
 
     # Return response
-    return jsonify({"choices": [{"delta": {"role": "assistant", "content":  ''.join(outputs)}}]})
+    return jsonify(
+        {"choices": [{"delta": {"role": "assistant", "content": "".join(outputs)}}]}
+    )
 
 
 def get_prompt(messages: list[dict], system_prompt: str) -> str:
@@ -91,13 +103,15 @@ def get_prompt(messages: list[dict], system_prompt: str) -> str:
 
     do_strip = False
     for message in messages:
-        content = message["content"].strip() if do_strip else message["content"]
+        messageContent = message["content"].strip() if do_strip else message["content"]
         if message["role"] == "user":
-            texts.append(f"{content} [/INST] ")
+            texts.append(f"{messageContent} [/INST] ")
         else:
-            texts.append(f" {content.strip()} </s><s>[INST] ")
+            texts.append(f" {messageContent.strip()} </s><s>[INST] ")
         do_strip = True
-
+    print("-------------------")
+    print("".join(texts))
+    print("-------------------")
     return "".join(texts)
 
 
@@ -106,9 +120,20 @@ def run_chat_completion(
     max_new_tokens: int = 1024,
     temperature: float = 0.1,
     top_p: float = 0.9,
-    top_k: int = 50,
+    top_k: int = 10,
 ) -> str:
-    system_prompt = "The following is a conversation with an AI assistant. The assistant is helpful, harmless, and honest."
+    system_prompt: str = (
+        "The following is a conversation with an AI assistant. The assistant is helpful, harmless, and honest.",
+    )
+
+    # get system prompt from messages
+    system_prompt = ""
+    for message in messages:
+        if message["role"] == "system":
+            system_prompt = message["content"]
+            messages.remove(message)
+            break
+
     prompt = get_prompt(messages, system_prompt)
 
     inputs = tokenizer([prompt], return_tensors="pt", add_special_tokens=False).to(
@@ -116,7 +141,7 @@ def run_chat_completion(
     )
 
     streamer = TextIteratorStreamer(
-        tokenizer, timeout=10.0, skip_prompt=True, skip_special_tokens=True
+        tokenizer, timeout=1000.0, skip_prompt=True, skip_special_tokens=True
     )
 
     generate_kwargs = dict(
@@ -128,6 +153,8 @@ def run_chat_completion(
         top_k=top_k,
         temperature=temperature,
         num_beams=1,
+        eos_token_id=2, 
+        pad_token_id=2
     )
 
     t = Thread(target=model.generate, kwargs=generate_kwargs)
