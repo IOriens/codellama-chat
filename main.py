@@ -41,6 +41,40 @@ app = Flask(__name__)
 CORS(app)
 
 
+@app.route("/v1/completions", methods=["POST"])
+def completions():
+    content = request.json
+    
+    # Is used by Continue to generate a relevant title corresponding to the
+    # model's response, however, the current prompt passed by Continue is not
+    # good at obtaining a title from Code Llama's completion feature so we
+    # use chat completion instead.
+    messages = [
+        {
+            "role": "user",
+            "content": content["prompt"]
+        }
+    ]
+
+    print("-------------------")
+    print(content["prompt"])
+    print("-------------------")
+    
+    # Perform Code Llama chat completion.
+    response = run_chat_completion(messages)
+
+        # get outputs
+    outputs = []
+    if not response is None:
+        for text in response:
+            outputs.append(text)
+    else:
+        print("response is None")
+    
+    # Send back the response.
+    return jsonify({"choices": [{"text":  "".join(outputs)}]})
+
+
 @app.route("/v1/chat/completions", methods=["POST"])
 def chat_completions():
     content = request.json

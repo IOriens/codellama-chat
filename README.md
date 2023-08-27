@@ -54,6 +54,20 @@ python main.py
 
 The application will run on the default host (usually `localhost`) and port (typically `5000`). You can interact with the AI assistant by accessing `http://localhost:5000`.
 
+
+## Usage
+
+### Continue Integration
+
+Type `/config` and change model config like [ggml](https://continue.dev/docs/customization#local-models-with-ggml)
+
+### Chatgpt Next Web
+
+Change endpoint to `http://localhost:5000`
+
+
+
+
 ## API Endpoints
 
 ### POST `/v1/chat/completions`
